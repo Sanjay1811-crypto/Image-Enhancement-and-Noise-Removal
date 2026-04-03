@@ -1,0 +1,1015 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DIP — Image Enhancement Lab</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600&family=Syne:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:        #060b14;
+  --surface:   #0d1525;
+  --card:      #111c32;
+  --border:    #1e3050;
+  --accent1:   #00d4ff;
+  --accent2:   #7c3aed;
+  --accent3:   #10b981;
+  --warn:      #f59e0b;
+  --text:      #e2e8f0;
+  --muted:     #64748b;
+  --hist-in:   #00d4ff;
+  --hist-out:  #10b981;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Syne', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* ── grid bg ── */
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background-image:
+    linear-gradient(rgba(0,212,255,.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,212,255,.03) 1px, transparent 1px);
+  background-size: 40px 40px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ── HEADER ── */
+header {
+  position: relative; z-index: 1;
+  padding: 28px 40px 20px;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+  background: rgba(13,21,37,.8);
+  backdrop-filter: blur(12px);
+}
+.logo {
+  display: flex; align-items: center; gap: 14px;
+}
+.logo-icon {
+  width: 42px; height: 42px;
+  background: linear-gradient(135deg, var(--accent1), var(--accent2));
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px;
+}
+.logo-text { font-size: 22px; font-weight: 800; letter-spacing: -0.5px; }
+.logo-text span { color: var(--accent1); }
+.badge {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px; font-weight: 400;
+  color: var(--accent3);
+  border: 1px solid var(--accent3);
+  padding: 4px 10px; border-radius: 20px;
+  letter-spacing: 1px;
+}
+
+/* ── UPLOAD ZONE ── */
+.upload-zone {
+  position: relative; z-index: 1;
+  margin: 32px 40px 0;
+  border: 2px dashed var(--border);
+  border-radius: 16px;
+  padding: 32px;
+  text-align: center;
+  background: var(--surface);
+  transition: border-color .3s, background .3s;
+  cursor: pointer;
+}
+.upload-zone:hover, .upload-zone.drag-over {
+  border-color: var(--accent1);
+  background: rgba(0,212,255,.04);
+}
+.upload-zone input[type="file"] {
+  position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
+}
+.upload-icon { font-size: 36px; margin-bottom: 10px; }
+.upload-title { font-size: 18px; font-weight: 600; margin-bottom: 6px; }
+.upload-sub { font-size: 13px; color: var(--muted); font-family: 'JetBrains Mono', monospace; }
+
+/* ── CONTROLS ── */
+.controls {
+  position: relative; z-index: 1;
+  display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;
+  margin: 24px 40px;
+}
+.btn {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px; font-weight: 600;
+  padding: 11px 22px;
+  border: none; border-radius: 10px;
+  cursor: pointer;
+  transition: transform .15s, box-shadow .15s, opacity .15s;
+  letter-spacing: .5px;
+  position: relative; overflow: hidden;
+}
+.btn:hover { transform: translateY(-2px); }
+.btn:active { transform: scale(.97); }
+.btn-gray   { background: rgba(100,116,139,.18); color: var(--text); border: 1px solid var(--border); }
+.btn-cyan   { background: linear-gradient(135deg,#0891b2,#0e7490); color:#fff; box-shadow: 0 4px 20px rgba(0,212,255,.25); }
+.btn-purple { background: linear-gradient(135deg,#7c3aed,#6d28d9); color:#fff; box-shadow: 0 4px 20px rgba(124,58,237,.35); }
+.btn-green  { background: linear-gradient(135deg,#059669,#047857); color:#fff; box-shadow: 0 4px 20px rgba(16,185,129,.3); }
+.btn-reset  { background: rgba(245,158,11,.12); color: var(--warn); border: 1px solid rgba(245,158,11,.3); }
+
+/* ── PIPELINE STATUS ── */
+.pipeline {
+  position: relative; z-index: 1;
+  display: flex; align-items: center; justify-content: center; gap: 0;
+  margin: 0 40px 28px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+}
+.pipe-step {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  padding: 8px 14px;
+}
+.pipe-dot {
+  width: 10px; height: 10px; border-radius: 50%;
+  background: var(--border); border: 2px solid var(--muted);
+  transition: background .4s, border-color .4s, box-shadow .4s;
+}
+.pipe-dot.active { background: var(--accent1); border-color: var(--accent1); box-shadow: 0 0 10px var(--accent1); }
+.pipe-dot.done   { background: var(--accent3); border-color: var(--accent3); }
+.pipe-label { color: var(--muted); font-size: 10px; white-space: nowrap; transition: color .3s; }
+.pipe-label.active { color: var(--accent1); }
+.pipe-label.done   { color: var(--accent3); }
+.pipe-line {
+  flex: 1; height: 1px; background: var(--border);
+  max-width: 60px; min-width: 20px;
+}
+
+/* ── MAIN GRID ── */
+.workspace {
+  position: relative; z-index: 1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  margin: 0 40px 40px;
+}
+
+.panel {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  overflow: hidden;
+  transition: border-color .3s;
+}
+.panel:hover { border-color: rgba(0,212,255,.25); }
+
+.panel-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+}
+.panel-title {
+  display: flex; align-items: center; gap: 10px;
+  font-size: 13px; font-weight: 600; letter-spacing: .5px;
+}
+.panel-dot { width: 8px; height: 8px; border-radius: 50%; }
+.dot-cyan   { background: var(--accent1); box-shadow: 0 0 6px var(--accent1); }
+.dot-green  { background: var(--accent3); box-shadow: 0 0 6px var(--accent3); }
+.panel-meta {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px; color: var(--muted);
+}
+
+.canvas-wrap {
+  display: flex; justify-content: center; align-items: center;
+  padding: 16px; min-height: 200px;
+  background: rgba(0,0,0,.25);
+}
+canvas.img-canvas {
+  max-width: 100%; max-height: 320px;
+  border-radius: 8px;
+  display: none;
+}
+.empty-state {
+  display: flex; flex-direction: column; align-items: center; gap: 8px;
+  color: var(--muted); font-size: 13px; font-family: 'JetBrains Mono', monospace;
+}
+.empty-state .ei { font-size: 32px; opacity: .3; }
+
+/* ── STATS ROW ── */
+.stats-row {
+  display: flex; gap: 0;
+  border-top: 1px solid var(--border);
+}
+.stat {
+  flex: 1; padding: 10px 14px; text-align: center;
+  border-right: 1px solid var(--border);
+}
+.stat:last-child { border-right: none; }
+.stat-val {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 15px; font-weight: 600;
+}
+.stat-lbl { font-size: 9px; color: var(--muted); letter-spacing: .5px; margin-top: 2px; text-transform: uppercase; }
+
+/* ── HISTOGRAM SECTION ── */
+.hist-section {
+  position: relative; z-index: 1;
+  margin: 0 40px 40px;
+}
+.hist-title {
+  font-size: 18px; font-weight: 800;
+  margin-bottom: 20px;
+  display: flex; align-items: center; gap: 12px;
+}
+.hist-title::after {
+  content: '';
+  flex: 1; height: 1px;
+  background: linear-gradient(90deg, var(--border), transparent);
+}
+
+.hist-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  margin-bottom: 24px;
+}
+
+.hist-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  overflow: hidden;
+}
+.hist-card-header {
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.hist-card-title {
+  font-size: 13px; font-weight: 600;
+  display: flex; align-items: center; gap: 8px;
+}
+.hist-card-sub {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px; color: var(--muted);
+}
+.hist-body { padding: 16px; }
+
+/* channel tabs */
+.channel-tabs {
+  display: flex; gap: 6px; margin-bottom: 12px;
+}
+.ch-tab {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px; padding: 4px 10px;
+  border-radius: 6px; cursor: pointer;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  transition: all .2s;
+}
+.ch-tab.active { color: #fff; border-color: transparent; }
+.ch-tab.lum.active    { background: rgba(0,212,255,.25);  color: var(--accent1); border-color: var(--accent1); }
+.ch-tab.red.active    { background: rgba(239,68,68,.25);  color: #ef4444; border-color: #ef4444; }
+.ch-tab.green.active  { background: rgba(34,197,94,.25);  color: #22c55e; border-color: #22c55e; }
+.ch-tab.blue.active   { background: rgba(59,130,246,.25); color: #3b82f6; border-color: #3b82f6; }
+
+canvas.hist-canvas {
+  width: 100%; height: 160px;
+  border-radius: 8px;
+  background: rgba(0,0,0,.3);
+  display: block;
+}
+
+/* axis */
+.hist-axis {
+  display: flex; justify-content: space-between;
+  margin-top: 4px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 9px; color: var(--muted);
+}
+
+/* hist stats row */
+.hist-stats {
+  display: flex; gap: 0;
+  border-top: 1px solid var(--border);
+}
+.hstat {
+  flex: 1; padding: 10px 12px; text-align: center;
+  border-right: 1px solid var(--border);
+}
+.hstat:last-child { border-right: none; }
+.hstat-val {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px; font-weight: 600;
+}
+.hstat-lbl { font-size: 9px; color: var(--muted); margin-top: 2px; text-transform: uppercase; }
+
+/* ── OVERLAY HISTOGRAM ── */
+.overlay-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  overflow: hidden;
+}
+.overlay-header {
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.overlay-body { padding: 16px; }
+canvas.overlay-canvas {
+  width: 100%; height: 200px;
+  border-radius: 8px;
+  background: rgba(0,0,0,.3);
+  display: block;
+}
+.overlay-legend {
+  display: flex; gap: 20px; margin-top: 10px; justify-content: center;
+}
+.legend-item {
+  display: flex; align-items: center; gap: 6px;
+  font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--muted);
+}
+.legend-dot { width: 10px; height: 10px; border-radius: 3px; }
+
+/* ── DIFF SECTION ── */
+.diff-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  overflow: hidden;
+  margin-bottom: 20px;
+}
+.diff-header {
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px; font-weight: 600;
+  display: flex; align-items: center; gap: 8px;
+}
+.diff-body { padding: 16px; }
+canvas.diff-canvas {
+  width: 100%; height: 180px;
+  border-radius: 8px;
+  background: rgba(0,0,0,.3);
+  display: block;
+}
+
+/* ── FOOTER ── */
+footer {
+  position: relative; z-index: 1;
+  border-top: 1px solid var(--border);
+  padding: 16px 40px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px; color: var(--muted);
+  display: flex; justify-content: space-between; align-items: center;
+}
+
+/* ── ANIMATIONS ── */
+@keyframes fadeIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:none; } }
+.fade-in { animation: fadeIn .4s ease forwards; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.5} }
+.processing { animation: pulse .8s infinite; }
+
+/* responsive */
+@media(max-width: 900px) {
+  .workspace, .hist-grid { grid-template-columns: 1fr; }
+  header, .upload-zone, .controls, .pipeline, .workspace, .hist-section, footer { margin-left:16px; margin-right:16px; }
+}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header>
+  <div class="logo">
+    <div class="logo-icon">⚗</div>
+    <div>
+      <div class="logo-text">DIP <span>Lab</span></div>
+      <div style="font-size:11px;color:var(--muted);font-family:'JetBrains Mono',monospace;font-weight:300">Image Enhancement System</div>
+    </div>
+  </div>
+  <div class="badge">BCSE403L · VIT</div>
+</header>
+
+<!-- UPLOAD -->
+<div class="upload-zone" id="dropZone">
+  <input type="file" id="upload" accept="image/*">
+  <div class="upload-icon">📂</div>
+  <div class="upload-title">Drop an image or click to browse</div>
+  <div class="upload-sub">JPEG / PNG / BMP · Max 10MB</div>
+</div>
+
+<!-- CONTROLS -->
+<div class="controls">
+  <button class="btn btn-gray"   onclick="applyGray()">⬜ Grayscale</button>
+  <button class="btn btn-purple" onclick="applyNoise()">⚡ Add Noise</button>
+  <button class="btn btn-cyan"   onclick="applyMedian()">🔲 Median Filter</button>
+  <button class="btn btn-green"  onclick="applyHistEq()">📊 Hist. Equalize</button>
+  <button class="btn btn-reset"  onclick="resetAll()">↺ Reset</button>
+</div>
+
+<!-- PIPELINE STATUS -->
+<div class="pipeline">
+  <div class="pipe-step">
+    <div class="pipe-dot" id="pd0"></div>
+    <div class="pipe-label" id="pl0">LOAD</div>
+  </div>
+  <div class="pipe-line"></div>
+  <div class="pipe-step">
+    <div class="pipe-dot" id="pd1"></div>
+    <div class="pipe-label" id="pl1">GRAY</div>
+  </div>
+  <div class="pipe-line"></div>
+  <div class="pipe-step">
+    <div class="pipe-dot" id="pd2"></div>
+    <div class="pipe-label" id="pl2">NOISE</div>
+  </div>
+  <div class="pipe-line"></div>
+  <div class="pipe-step">
+    <div class="pipe-dot" id="pd3"></div>
+    <div class="pipe-label" id="pl3">DENOISE</div>
+  </div>
+  <div class="pipe-line"></div>
+  <div class="pipe-step">
+    <div class="pipe-dot" id="pd4"></div>
+    <div class="pipe-label" id="pl4">ENHANCE</div>
+  </div>
+</div>
+
+<!-- IMAGE PANELS -->
+<div class="workspace">
+
+  <!-- INPUT PANEL -->
+  <div class="panel">
+    <div class="panel-header">
+      <div class="panel-title">
+        <div class="panel-dot dot-cyan"></div>
+        INPUT IMAGE
+      </div>
+      <div class="panel-meta" id="inMeta">— no image —</div>
+    </div>
+    <div class="canvas-wrap" id="inWrap">
+      <div class="empty-state">
+        <div class="ei">🖼</div>
+        <div>Upload an image to begin</div>
+      </div>
+      <canvas id="original" class="img-canvas"></canvas>
+    </div>
+    <div class="stats-row">
+      <div class="stat"><div class="stat-val" id="inW">—</div><div class="stat-lbl">WIDTH px</div></div>
+      <div class="stat"><div class="stat-val" id="inH">—</div><div class="stat-lbl">HEIGHT px</div></div>
+      <div class="stat"><div class="stat-val" id="inMean">—</div><div class="stat-lbl">MEAN</div></div>
+      <div class="stat"><div class="stat-val" id="inStd">—</div><div class="stat-lbl">STD DEV</div></div>
+    </div>
+  </div>
+
+  <!-- OUTPUT PANEL -->
+  <div class="panel">
+    <div class="panel-header">
+      <div class="panel-title">
+        <div class="panel-dot dot-green"></div>
+        OUTPUT IMAGE
+      </div>
+      <div class="panel-meta" id="outMeta">— awaiting processing —</div>
+    </div>
+    <div class="canvas-wrap" id="outWrap">
+      <div class="empty-state">
+        <div class="ei">✨</div>
+        <div>Apply operations to see output</div>
+      </div>
+      <canvas id="processed" class="img-canvas"></canvas>
+    </div>
+    <div class="stats-row">
+      <div class="stat"><div class="stat-val" id="outW">—</div><div class="stat-lbl">WIDTH px</div></div>
+      <div class="stat"><div class="stat-val" id="outH">—</div><div class="stat-lbl">HEIGHT px</div></div>
+      <div class="stat"><div class="stat-val" id="outMean">—</div><div class="stat-lbl">MEAN</div></div>
+      <div class="stat"><div class="stat-val" id="outStd">—</div><div class="stat-lbl">STD DEV</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- HISTOGRAM SECTION -->
+<div class="hist-section">
+  <div class="hist-title">Histogram Analysis</div>
+
+  <div class="hist-grid">
+
+    <!-- INPUT HISTOGRAM -->
+    <div class="hist-card">
+      <div class="hist-card-header">
+        <div class="hist-card-title">
+          <span style="color:var(--accent1)">◆</span> Input Histogram
+        </div>
+        <div class="hist-card-sub" id="inHistMeta">256 bins · intensity [0–255]</div>
+      </div>
+      <div class="hist-body">
+        <div class="channel-tabs" id="inTabs">
+          <button class="ch-tab lum active" onclick="setInCh('lum',this)">Luminance</button>
+          <button class="ch-tab red"        onclick="setInCh('r',this)">R</button>
+          <button class="ch-tab green"      onclick="setInCh('g',this)">G</button>
+          <button class="ch-tab blue"       onclick="setInCh('b',this)">B</button>
+        </div>
+        <canvas id="histIn" class="hist-canvas" width="600" height="160"></canvas>
+        <div class="hist-axis">
+          <span>0</span><span>32</span><span>64</span><span>96</span><span>128</span>
+          <span>160</span><span>192</span><span>224</span><span>255</span>
+        </div>
+      </div>
+      <div class="hist-stats">
+        <div class="hstat"><div class="hstat-val" id="inPeak" style="color:var(--accent1)">—</div><div class="hstat-lbl">Peak Bin</div></div>
+        <div class="hstat"><div class="hstat-val" id="inMax">—</div><div class="hstat-lbl">Max Count</div></div>
+        <div class="hstat"><div class="hstat-val" id="inEntropy">—</div><div class="hstat-lbl">Entropy (bits)</div></div>
+        <div class="hstat"><div class="hstat-val" id="inSkew">—</div><div class="hstat-lbl">Skewness</div></div>
+      </div>
+    </div>
+
+    <!-- OUTPUT HISTOGRAM -->
+    <div class="hist-card">
+      <div class="hist-card-header">
+        <div class="hist-card-title">
+          <span style="color:var(--accent3)">◆</span> Output Histogram
+        </div>
+        <div class="hist-card-sub" id="outHistMeta">256 bins · intensity [0–255]</div>
+      </div>
+      <div class="hist-body">
+        <div class="channel-tabs" id="outTabs">
+          <button class="ch-tab lum active" onclick="setOutCh('lum',this)">Luminance</button>
+          <button class="ch-tab red"        onclick="setOutCh('r',this)">R</button>
+          <button class="ch-tab green"      onclick="setOutCh('g',this)">G</button>
+          <button class="ch-tab blue"       onclick="setOutCh('b',this)">B</button>
+        </div>
+        <canvas id="histOut" class="hist-canvas" width="600" height="160"></canvas>
+        <div class="hist-axis">
+          <span>0</span><span>32</span><span>64</span><span>96</span><span>128</span>
+          <span>160</span><span>192</span><span>224</span><span>255</span>
+        </div>
+      </div>
+      <div class="hist-stats">
+        <div class="hstat"><div class="hstat-val" id="outPeak" style="color:var(--accent3)">—</div><div class="hstat-lbl">Peak Bin</div></div>
+        <div class="hstat"><div class="hstat-val" id="outMax">—</div><div class="hstat-lbl">Max Count</div></div>
+        <div class="hstat"><div class="hstat-val" id="outEntropy">—</div><div class="hstat-lbl">Entropy (bits)</div></div>
+        <div class="hstat"><div class="hstat-val" id="outSkew">—</div><div class="hstat-lbl">Skewness</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- OVERLAY COMPARISON -->
+  <div class="overlay-card">
+    <div class="overlay-header">
+      <div style="font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px;">
+        <span style="color:var(--warn)">◆</span> Overlay Comparison — Input vs Output
+      </div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--muted)">Luminance channel</div>
+    </div>
+    <div class="overlay-body">
+      <canvas id="histOverlay" class="overlay-canvas" width="600" height="200"></canvas>
+      <div class="overlay-legend">
+        <div class="legend-item"><div class="legend-dot" style="background:rgba(0,212,255,.8)"></div>Input</div>
+        <div class="legend-item"><div class="legend-dot" style="background:rgba(16,185,129,.8)"></div>Output</div>
+        <div class="legend-item"><div class="legend-dot" style="background:rgba(245,158,11,.5)"></div>Difference</div>
+      </div>
+      <!-- difference bar chart below overlay -->
+      <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border)">
+        <div style="font-size:11px;color:var(--muted);font-family:'JetBrains Mono',monospace;margin-bottom:8px;">
+          ΔHISTOGRAM — green = output gained pixels · red = output lost pixels
+        </div>
+        <canvas id="histDiff" class="diff-canvas" width="600" height="100" style="height:100px"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- METRICS COMPARISON TABLE -->
+  <div style="margin-top:20px;background:var(--card);border:1px solid var(--border);border-radius:16px;overflow:hidden;">
+    <div style="padding:14px 18px;border-bottom:1px solid var(--border);font-size:13px;font-weight:600;display:flex;align-items:center;gap:8px;">
+      <span style="color:var(--warn)">◆</span> Pixel Statistics Comparison
+    </div>
+    <table style="width:100%;border-collapse:collapse;font-family:'JetBrains Mono',monospace;font-size:12px;">
+      <thead>
+        <tr style="background:rgba(0,0,0,.3);">
+          <th style="padding:10px 18px;text-align:left;color:var(--muted);font-weight:400;font-size:10px;letter-spacing:1px;">METRIC</th>
+          <th style="padding:10px 18px;text-align:right;color:var(--accent1);font-weight:400;font-size:10px;letter-spacing:1px;">INPUT</th>
+          <th style="padding:10px 18px;text-align:right;color:var(--accent3);font-weight:400;font-size:10px;letter-spacing:1px;">OUTPUT</th>
+          <th style="padding:10px 18px;text-align:right;color:var(--warn);font-weight:400;font-size:10px;letter-spacing:1px;">CHANGE</th>
+        </tr>
+      </thead>
+      <tbody id="metricsTable">
+        <tr><td colspan="4" style="padding:18px;text-align:center;color:var(--muted)">Upload an image to see statistics</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+</div>
+
+<footer>
+  <span>DIP Lab · BCSE403L · Nuzella Prabhakara Sanjay · 23BCE0211</span>
+  <span id="footerStatus">Ready</span>
+</footer>
+
+<script>
+// ─────────────────────────────────────────────────────────────────────────────
+// STATE
+// ─────────────────────────────────────────────────────────────────────────────
+const oc  = document.getElementById('original');
+const pc  = document.getElementById('processed');
+const hIn = document.getElementById('histIn');
+const hOut= document.getElementById('histOut');
+const hOv = document.getElementById('histOverlay');
+const hDf = document.getElementById('histDiff');
+
+const oCtx= oc.getContext('2d');
+const pCtx= pc.getContext('2d');
+
+let origImg = null;
+let inCh  = 'lum';
+let outCh = 'lum';
+let pipeStep = 0;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// UPLOAD
+// ─────────────────────────────────────────────────────────────────────────────
+const dz = document.getElementById('dropZone');
+dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag-over'); });
+dz.addEventListener('dragleave',()=> dz.classList.remove('drag-over'));
+dz.addEventListener('drop', e => {
+  e.preventDefault(); dz.classList.remove('drag-over');
+  const f = e.dataTransfer.files[0]; if(f) loadFile(f);
+});
+document.getElementById('upload').addEventListener('change', e => {
+  if(e.target.files[0]) loadFile(e.target.files[0]);
+});
+
+function loadFile(file) {
+  const reader = new FileReader();
+  reader.onload = ev => {
+    origImg = new Image();
+    origImg.onload = () => {
+      oc.width = pc.width = origImg.width;
+      oc.height= pc.height= origImg.height;
+      oCtx.drawImage(origImg,0,0);
+      pCtx.drawImage(origImg,0,0);
+      showCanvases();
+      updateAll();
+      setStatus('Image loaded — ' + file.name);
+      setPipe(0, 'active');
+    };
+    origImg.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function showCanvases() {
+  document.querySelectorAll('.empty-state').forEach(e => e.style.display='none');
+  document.querySelectorAll('.img-canvas').forEach(c => { c.style.display='block'; c.classList.add('fade-in'); });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// IMAGE OPERATIONS
+// ─────────────────────────────────────────────────────────────────────────────
+function applyGray() {
+  if(!origImg) return;
+  let d = pCtx.getImageData(0,0,pc.width,pc.height);
+  for(let i=0;i<d.data.length;i+=4){
+    const g = Math.round(0.299*d.data[i]+0.587*d.data[i+1]+0.114*d.data[i+2]);
+    d.data[i]=d.data[i+1]=d.data[i+2]=g;
+  }
+  pCtx.putImageData(d,0,0);
+  updateAll(); setPipe(1,'done'); setStatus('Grayscale applied (luminance weights)');
+}
+
+function applyNoise() {
+  if(!origImg) return;
+  let d = pCtx.getImageData(0,0,pc.width,pc.height);
+  for(let y=0;y<pc.height;y+=10)
+    for(let x=0;x<pc.width;x+=10){
+      const idx=(y*pc.width+x)*4;
+      const v = Math.random()>.5 ? 255 : 0;
+      d.data[idx]=d.data[idx+1]=d.data[idx+2]=v;
+    }
+  pCtx.putImageData(d,0,0);
+  updateAll(); setPipe(2,'done'); setStatus('Salt-and-pepper noise added');
+}
+
+function applyMedian() {
+  if(!origImg) return;
+  const w=pc.width, h=pc.height;
+  const src = pCtx.getImageData(0,0,w,h);
+  const dst = pCtx.createImageData(w,h);
+  const s=src.data, d=dst.data;
+  const ks=2; // 5x5 kernel (±2)
+  for(let y=0;y<h;y++) for(let x=0;x<w;x++){
+    const idx=(y*w+x)*4;
+    let rv=[],gv=[],bv=[];
+    for(let dy=-ks;dy<=ks;dy++) for(let dx=-ks;dx<=ks;dx++){
+      const ny=Math.min(Math.max(y+dy,0),h-1);
+      const nx=Math.min(Math.max(x+dx,0),w-1);
+      const ni=(ny*w+nx)*4;
+      rv.push(s[ni]); gv.push(s[ni+1]); bv.push(s[ni+2]);
+    }
+    rv.sort((a,b)=>a-b); gv.sort((a,b)=>a-b); bv.sort((a,b)=>a-b);
+    const m=Math.floor(rv.length/2);
+    d[idx]=rv[m]; d[idx+1]=gv[m]; d[idx+2]=bv[m]; d[idx+3]=255;
+  }
+  pCtx.putImageData(dst,0,0);
+  updateAll(); setPipe(3,'done'); setStatus('5×5 Median filter applied');
+}
+
+function applyHistEq() {
+  if(!origImg) return;
+  const d = pCtx.getImageData(0,0,pc.width,pc.height);
+  const px = d.data;
+  // convert to YUV, equalize Y only
+  const n = pc.width*pc.height;
+  const hist = new Array(256).fill(0);
+  for(let i=0;i<px.length;i+=4){
+    const lum = Math.round(0.299*px[i]+0.587*px[i+1]+0.114*px[i+2]);
+    hist[lum]++;
+  }
+  const cdf=[hist[0]];
+  for(let i=1;i<256;i++) cdf[i]=cdf[i-1]+hist[i];
+  const cdfMin = cdf.find(v=>v>0);
+  for(let i=0;i<px.length;i+=4){
+    const lum = Math.round(0.299*px[i]+0.587*px[i+1]+0.114*px[i+2]);
+    const eq  = Math.round(((cdf[lum]-cdfMin)/(n-cdfMin))*255);
+    const scale = lum > 0 ? eq/lum : 1;
+    px[i]  = Math.min(255,Math.round(px[i]  *scale));
+    px[i+1]= Math.min(255,Math.round(px[i+1]*scale));
+    px[i+2]= Math.min(255,Math.round(px[i+2]*scale));
+  }
+  pCtx.putImageData(d,0,0);
+  updateAll(); setPipe(4,'done'); setStatus('Histogram equalization applied');
+}
+
+function resetAll() {
+  if(!origImg) return;
+  pCtx.drawImage(origImg,0,0);
+  updateAll();
+  for(let i=0;i<5;i++) setPipe(i,'');
+  setPipe(0,'active');
+  setStatus('Reset to original');
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// HISTOGRAM ENGINE
+// ─────────────────────────────────────────────────────────────────────────────
+function getPixelData(ctx, w, h) {
+  return ctx.getImageData(0,0,w,h).data;
+}
+
+function buildHists(data) {
+  const h = { r:new Array(256).fill(0), g:new Array(256).fill(0),
+               b:new Array(256).fill(0), lum:new Array(256).fill(0) };
+  for(let i=0;i<data.length;i+=4){
+    h.r[data[i]]++;
+    h.g[data[i+1]]++;
+    h.b[data[i+2]]++;
+    const l = Math.round(0.299*data[i]+0.587*data[i+1]+0.114*data[i+2]);
+    h.lum[Math.min(255,l)]++;
+  }
+  return h;
+}
+
+function computeStats(hist) {
+  let total=0, sum=0, sum2=0;
+  for(let i=0;i<256;i++){ total+=hist[i]; sum+=i*hist[i]; }
+  const mean = total>0 ? sum/total : 0;
+  for(let i=0;i<256;i++) sum2+=hist[i]*(i-mean)**2;
+  const std  = Math.sqrt(sum2/total);
+  let peakBin=0, peakVal=0;
+  for(let i=0;i<256;i++) if(hist[i]>peakVal){ peakVal=hist[i]; peakBin=i; }
+  // entropy
+  let entropy=0;
+  for(let i=0;i<256;i++) if(hist[i]>0){ const p=hist[i]/total; entropy-=p*Math.log2(p); }
+  // skewness
+  let sk=0;
+  for(let i=0;i<256;i++) sk+=hist[i]*((i-mean)/Math.max(std,1))**3;
+  const skewness = sk/total;
+  return { mean, std, peakBin, peakVal: peakVal.toLocaleString(), entropy: entropy.toFixed(2), skewness: skewness.toFixed(2) };
+}
+
+// draw a single histogram on a canvas
+function drawHist(canvas, hist, color, fillColor) {
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0,0,W,H);
+
+  // grid lines
+  ctx.strokeStyle='rgba(255,255,255,.05)'; ctx.lineWidth=1;
+  for(let g=0;g<5;g++){
+    const y = (H/4)*g;
+    ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke();
+  }
+  for(let g=0;g<=8;g++){
+    const x = (W/8)*g;
+    ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke();
+  }
+
+  const max = Math.max(...hist, 1);
+  const bw  = W/256;
+
+  // filled area
+  ctx.beginPath();
+  ctx.moveTo(0, H);
+  for(let i=0;i<256;i++){
+    const x = i*bw;
+    const h = (hist[i]/max)*H;
+    ctx.lineTo(x, H-h);
+  }
+  ctx.lineTo(W, H);
+  ctx.closePath();
+  ctx.fillStyle = fillColor;
+  ctx.fill();
+
+  // top line
+  ctx.beginPath();
+  for(let i=0;i<256;i++){
+    const x=i*bw, h=(hist[i]/max)*H;
+    if(i===0) ctx.moveTo(x,H-h); else ctx.lineTo(x,H-h);
+  }
+  ctx.strokeStyle=color; ctx.lineWidth=1.5; ctx.stroke();
+}
+
+// draw overlay
+function drawOverlay(inHists, outHists) {
+  const ctx = hOv.getContext('2d');
+  const W=hOv.width, H=hOv.height;
+  ctx.clearRect(0,0,W,H);
+
+  // grid
+  ctx.strokeStyle='rgba(255,255,255,.04)'; ctx.lineWidth=1;
+  for(let g=0;g<5;g++){ const y=(H/4)*g; ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke(); }
+  for(let g=0;g<=8;g++){ const x=(W/8)*g; ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke(); }
+
+  const ih = inHists.lum, oh = outHists.lum;
+  const max = Math.max(Math.max(...ih), Math.max(...oh), 1);
+  const bw = W/256;
+
+  // input fill
+  ctx.beginPath(); ctx.moveTo(0,H);
+  for(let i=0;i<256;i++) ctx.lineTo(i*bw, H-(ih[i]/max)*H);
+  ctx.lineTo(W,H); ctx.closePath();
+  ctx.fillStyle='rgba(0,212,255,.15)'; ctx.fill();
+  ctx.beginPath();
+  for(let i=0;i<256;i++){ const x=i*bw,h=(ih[i]/max)*H; if(i===0)ctx.moveTo(x,H-h); else ctx.lineTo(x,H-h); }
+  ctx.strokeStyle='rgba(0,212,255,.8)'; ctx.lineWidth=1.5; ctx.stroke();
+
+  // output fill
+  ctx.beginPath(); ctx.moveTo(0,H);
+  for(let i=0;i<256;i++) ctx.lineTo(i*bw, H-(oh[i]/max)*H);
+  ctx.lineTo(W,H); ctx.closePath();
+  ctx.fillStyle='rgba(16,185,129,.15)'; ctx.fill();
+  ctx.beginPath();
+  for(let i=0;i<256;i++){ const x=i*bw,h=(oh[i]/max)*H; if(i===0)ctx.moveTo(x,H-h); else ctx.lineTo(x,H-h); }
+  ctx.strokeStyle='rgba(16,185,129,.8)'; ctx.lineWidth=1.5; ctx.stroke();
+}
+
+// draw difference
+function drawDiff(inHists, outHists) {
+  const ctx = hDf.getContext('2d');
+  const W=hDf.width, H=hDf.height;
+  ctx.clearRect(0,0,W,H);
+  const ih=inHists.lum, oh=outHists.lum;
+  const diff = ih.map((_,i)=>oh[i]-ih[i]);
+  const maxAbs = Math.max(...diff.map(Math.abs),1);
+  const bw = W/256;
+  const mid = H/2;
+
+  // baseline
+  ctx.strokeStyle='rgba(255,255,255,.1)'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(0,mid); ctx.lineTo(W,mid); ctx.stroke();
+
+  for(let i=0;i<256;i++){
+    const h = (diff[i]/maxAbs)*(mid-2);
+    ctx.fillStyle = diff[i]>=0 ? 'rgba(16,185,129,.7)' : 'rgba(239,68,68,.7)';
+    if(diff[i]>=0) ctx.fillRect(i*bw, mid-h, Math.max(bw,.8), h);
+    else            ctx.fillRect(i*bw, mid,   Math.max(bw,.8), -h);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// UPDATE ALL
+// ─────────────────────────────────────────────────────────────────────────────
+let inHistsCache=null, outHistsCache=null;
+
+function updateAll() {
+  if(!origImg) return;
+
+  const inData  = getPixelData(oCtx, oc.width, oc.height);
+  const outData = getPixelData(pCtx, pc.width, pc.height);
+
+  inHistsCache  = buildHists(inData);
+  outHistsCache = buildHists(outData);
+
+  refreshInHist();
+  refreshOutHist();
+  drawOverlay(inHistsCache, outHistsCache);
+  drawDiff(inHistsCache, outHistsCache);
+  updateStats(inData, outData);
+  updateMetricsTable(inHistsCache, outHistsCache);
+}
+
+function refreshInHist() {
+  if(!inHistsCache) return;
+  const ch = inCh;
+  const colorMap = { lum:['#00d4ff','rgba(0,212,255,.2)'], r:['#ef4444','rgba(239,68,68,.2)'], g:['#22c55e','rgba(34,197,94,.2)'], b:['#3b82f6','rgba(59,130,246,.2)'] };
+  const [c,f] = colorMap[ch];
+  drawHist(hIn, inHistsCache[ch], c, f);
+  const s = computeStats(inHistsCache[ch]);
+  document.getElementById('inPeak').textContent    = s.peakBin;
+  document.getElementById('inMax').textContent     = s.peakVal;
+  document.getElementById('inEntropy').textContent = s.entropy;
+  document.getElementById('inSkew').textContent    = s.skewness;
+}
+
+function refreshOutHist() {
+  if(!outHistsCache) return;
+  const ch = outCh;
+  const colorMap = { lum:['#10b981','rgba(16,185,129,.2)'], r:['#ef4444','rgba(239,68,68,.2)'], g:['#22c55e','rgba(34,197,94,.2)'], b:['#3b82f6','rgba(59,130,246,.2)'] };
+  const [c,f] = colorMap[ch];
+  drawHist(hOut, outHistsCache[ch], c, f);
+  const s = computeStats(outHistsCache[ch]);
+  document.getElementById('outPeak').textContent    = s.peakBin;
+  document.getElementById('outMax').textContent     = s.peakVal;
+  document.getElementById('outEntropy').textContent = s.entropy;
+  document.getElementById('outSkew').textContent    = s.skewness;
+}
+
+function setInCh(ch, btn) {
+  inCh = ch;
+  document.querySelectorAll('#inTabs .ch-tab').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  refreshInHist();
+}
+function setOutCh(ch, btn) {
+  outCh = ch;
+  document.querySelectorAll('#outTabs .ch-tab').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  refreshOutHist();
+}
+
+function updateStats(inData, outData) {
+  function calc(data) {
+    let sum=0; const n=data.length/4;
+    for(let i=0;i<data.length;i+=4) sum+=Math.round(0.299*data[i]+0.587*data[i+1]+0.114*data[i+2]);
+    const mean=sum/n;
+    let v=0;
+    for(let i=0;i<data.length;i+=4){ const l=Math.round(0.299*data[i]+0.587*data[i+1]+0.114*data[i+2]); v+=(l-mean)**2; }
+    return { mean: mean.toFixed(1), std: Math.sqrt(v/n).toFixed(1) };
+  }
+  const i=calc(inData), o=calc(outData);
+  document.getElementById('inW').textContent    = oc.width;
+  document.getElementById('inH').textContent    = oc.height;
+  document.getElementById('inMean').textContent = i.mean;
+  document.getElementById('inStd').textContent  = i.std;
+  document.getElementById('inMeta').textContent = `${oc.width}×${oc.height}`;
+  document.getElementById('outW').textContent   = pc.width;
+  document.getElementById('outH').textContent   = pc.height;
+  document.getElementById('outMean').textContent= o.mean;
+  document.getElementById('outStd').textContent = o.std;
+  document.getElementById('outMeta').textContent= `${pc.width}×${pc.height} · processed`;
+}
+
+function updateMetricsTable(ih, oh) {
+  const metrics = [
+    { label:'Mean (Luminance)',  i: computeStats(ih.lum).mean, o: computeStats(oh.lum).mean, fmt: v=>parseFloat(v).toFixed(1), up: true },
+    { label:'Std Deviation',     i: computeStats(ih.lum).std,  o: computeStats(oh.lum).std,  fmt: v=>parseFloat(v).toFixed(1), up: true },
+    { label:'Entropy (bits)',    i: computeStats(ih.lum).entropy, o: computeStats(oh.lum).entropy, fmt:v=>v, up:true },
+    { label:'Peak Bin',          i: computeStats(ih.lum).peakBin, o: computeStats(oh.lum).peakBin, fmt:v=>v, up:false },
+    { label:'Peak Count',        i: computeStats(ih.lum).peakVal, o: computeStats(oh.lum).peakVal, fmt:v=>v, up:false },
+    { label:'Skewness',          i: computeStats(ih.lum).skewness,o: computeStats(oh.lum).skewness,fmt:v=>v, up:false },
+  ];
+  const rows = metrics.map(m => {
+    const iv=parseFloat(m.i), ov=parseFloat(m.o);
+    const delta = (ov-iv).toFixed(2);
+    const improved = m.up ? ov>=iv : ov<=iv;
+    const arrow = ov>iv ? '↑' : ov<iv ? '↓' : '—';
+    const color = improved ? 'var(--accent3)' : 'rgba(239,68,68,.9)';
+    return `<tr style="border-top:1px solid var(--border)">
+      <td style="padding:10px 18px;color:var(--muted)">${m.label}</td>
+      <td style="padding:10px 18px;text-align:right;color:var(--accent1)">${m.fmt(m.i)}</td>
+      <td style="padding:10px 18px;text-align:right;color:var(--accent3)">${m.fmt(m.o)}</td>
+      <td style="padding:10px 18px;text-align:right;color:${color}">${arrow} ${Math.abs(delta)}</td>
+    </tr>`;
+  }).join('');
+  document.getElementById('metricsTable').innerHTML = rows;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PIPELINE + FOOTER
+// ─────────────────────────────────────────────────────────────────────────────
+function setPipe(idx, state) {
+  const dot = document.getElementById('pd'+idx);
+  const lbl = document.getElementById('pl'+idx);
+  dot.className = 'pipe-dot' + (state ? ' '+state : '');
+  lbl.className = 'pipe-label' + (state ? ' '+state : '');
+}
+
+function setStatus(msg) {
+  document.getElementById('footerStatus').textContent = msg;
+}
+</script>
+</body>
+</html>
